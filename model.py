@@ -19,7 +19,7 @@ from sklearn.metrics import accuracy_score,confusion_matrix
 import pickle 
 
 
-crop= pd.read_csv("Crop_recommendation.csv")
+crop = pd.read_csv("Crop_recommendation.csv")
 
 crop_dict = {
     'rice': 1,
@@ -46,32 +46,30 @@ crop_dict = {
     'coffee': 22
 }
 
-crop['crop_num']=crop['label'].map(crop_dict);
-
-crop.drop('label',axis=1,inplace=True)
-
+crop['crop_num'] = crop['label'].map(crop_dict)
+crop.drop('label', axis=1, inplace=True)
 
 
-# train_test
-x=crop.drop('crop_num',axis=1)
-y=crop['crop_num']
+# train_test split
+x = crop.drop('crop_num', axis=1)
+y = crop['crop_num']
 X_train, X_test, y_train, y_test = train_test_split(
     x, y, test_size=0.2, random_state=42
 )
 
-
-ms=MinMaxScaler()
+# Scaling - This part was correct
+ms = MinMaxScaler()
 ms.fit(X_train)
-X_train=ms.transform(X_train)
-X_test=ms.transform(X_test)
-sc=StandardScaler()
+X_train = ms.transform(X_train)
+X_test = ms.transform(X_test)
+
+sc = StandardScaler()
 sc.fit(X_train)
-X_train=sc.transform(X_train)
-X_test=sc.transform(X_test)
-print(X_train)
+X_train = sc.transform(X_train)
+X_test = sc.transform(X_test)
 
-#train_model
 
+# Model training loop
 models = {
     'Logistic Regression': LogisticRegression(),
     'Naive Bayes': GaussianNB(),
@@ -84,52 +82,74 @@ models = {
     'Gradient Boosting': GradientBoostingClassifier(),
     'Extra Trees': ExtraTreeClassifier(),
 }
-for name,md in models.items():
-    md.fit(X_train,y_train)
-    ypred=md.predict(X_test)
-    print(f"{name} with accuracy {accuracy_score(y_test,ypred)}")
 
-rfc=RandomForestClassifier()
-rfc.fit(X_train,y_train)
-ypred=rfc.predict(X_test)
-# predective system
-def recommendation(N,P,k,temperature,humidity,ph,rainfall):
-    features = np.array([[N,P,k,temperature,humidity,ph,rainfall]])
-    transformed_features = ms.fit_transform(features)
-    prediction = rfc.predict(transformed_features)
-    print(prediction)
+print("--- Model Accuracies ---")
+for name, md in models.items():
+    md.fit(X_train, y_train)
+    ypred = md.predict(X_test)
+    print(f"{name} with accuracy: {accuracy_score(y_test, ypred)}")
+print("--------------------------\n")
+
+# Train the final model
+rfc = RandomForestClassifier()
+rfc.fit(X_train, y_train)
+ypred = rfc.predict(X_test)
+print(f"Final Model (Random Forest) accuracy: {accuracy_score(y_test, ypred)}")
+
+
+# -----------------------------------------------------------------
+# FIX 1: Corrected predictive system function
+# -----------------------------------------------------------------
+def recommendation(N, P, k, temperature, humidity, ph, rainfall):
+    features = np.array([[N, P, k, temperature, humidity, ph, rainfall]])
+    
+    # Step 1: Apply MinMaxScaler (use .transform, NOT .fit_transform)
+    scaled_features = ms.transform(features)
+    
+    # Step 2: Apply StandardScaler (this step was missing)
+    final_features = sc.transform(scaled_features)
+    
+    # Step 3: Make prediction
+    prediction = rfc.predict(final_features)
+    
     return prediction[0] 
 
+# Test values
+N = 9
+P = 420
+k = 200
+temperature = 20.87974371
+humidity = 82.00274423
+ph = 6.502985292000001
+rainfall = 202.9355362
 
-N = 100
-P = 90
-k = 100
-temperature = 50.0
-humidity = 90.0
-ph = 100
-rainfall = 202.0
-
-predict = recommendation(N,P,k,temperature,humidity,ph,rainfall)
-
-
+print("\n--- Test Prediction ---")
+predict = recommendation(N, P, k, temperature, humidity, ph, rainfall)
 
 crop_dict2 = {1: "Rice", 2: "Maize", 3: "Jute", 4: "Cotton", 5: "Coconut", 6: "Papaya", 7: "Orange",
-                 8: "Apple", 9: "Muskmelon", 10: "Watermelon", 11: "Grapes", 12: "Mango", 13: "Banana",
-                 14: "Pomegranate", 15: "Lentil", 16: "Blackgram", 17: "Mungbean", 18: "Mothbeans",
-                 19: "Pigeonpeas", 20: "Kidneybeans", 21: "Chickpea", 22: "Coffee"}
+              8: "Apple", 9: "Muskmelon", 10: "Watermelon", 11: "Grapes", 12: "Mango", 13: "Banana",
+              14: "Pomegranate", 15: "Lentil", 16: "Blackgram", 17: "Mungbean", 18: "Mothbeans",
+              19: "Pigeonpeas", 20: "Kidneybeans", 21: "Chickpea", 22: "Coffee"}
+              
 if predict in crop_dict2:
-    cp=crop_dict2[predict]
-    print(f"{cp} is the best crop to be cultivated")
+    cp = crop_dict2[predict]
+    print(f"Predicted Crop: {cp} is the best crop to be cultivated")
 else:
-    print("sorry we are unable to recommend a proper crop for this environment")
-
-pickle.dump(rfc,open('model.pkl','wb'))
-pickle.dump(ms,open('minmaxscaler.pkl','wb'))
-pickle.dump(ms,open('standscalar.pkl','wb'))
+    print("Sorry, we are unable to recommend a proper crop for this environment")
+print("--------------------------\n")
 
 
+# -----------------------------------------------------------------
+# FIX 2: Corrected pickle section
+# -----------------------------------------------------------------
+print("Saving models...")
+pickle.dump(rfc, open('model.pkl', 'wb'))
+pickle.dump(ms, open('minmaxscaler.pkl', 'wb'))
 
+# You were saving 'ms' twice. This now correctly saves 'sc'.
+pickle.dump(sc, open('standscaler.pkl', 'wb'))
 
+print("Models saved successfully.")
 
     
 
